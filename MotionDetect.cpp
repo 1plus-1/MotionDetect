@@ -6,6 +6,8 @@
 #include <string>
 #include <regex>
 #include <time.h>
+#include <unistd.h>
+#include <sys/stat.h>
 
 //#define DEBUG
 
@@ -15,6 +17,20 @@
 
 #define RECORDING_TIME_BEFORE_MOTION    2//seconds
 #define RECORDING_TIME_AFTER_MOTION     2//seconds
+
+#define APP_NAME        "motion_detect"
+#define APP_VERSION     "0.0.1"
+
+static const char doc[] =
+		APP_NAME " version " APP_VERSION;
+
+static const char optionsstr[] =
+		"-d  [DIR] set video file directory\n"
+		"-h  display help\n"
+		"-v  display version\n";
+
+static const char usage[] =
+		"Usage: " APP_NAME "[-d [DIR]] [-h] [-v]";
 
 uint64_t GetTimeUs(void)
 {
@@ -73,11 +89,50 @@ int main(int argc, char **argv)
     int count = 0;
 #endif
     cv::Mat frame, average32;
-    cv::VideoCapture camera(0);
     cv::VideoWriter *video = NULL;
     std::time_t lastMotionTime, t;
+    std::string videoDir = "./";
     bool bVideoRecording = false;
 
+    //parse parameters
+	int c;
+	while ((c = getopt(argc, argv, "d:vh")) != -1) {
+		switch (c) {
+        case 'd':
+            {
+                struct stat st;
+                if(stat(optarg, &st) == 0) {
+                    if((st.st_mode & S_IFDIR) != 0) {
+                        videoDir = optarg;
+                        if(videoDir.back() != '/')
+                            videoDir.append("/");
+                    } else {
+                        printf("%s is not folder\n", optarg);
+                        exit(EXIT_FAILURE);
+                    }
+                } else {
+                    printf("%s doesn't exists\n", optarg);
+                    exit(EXIT_FAILURE);
+                }
+            }
+            break;
+        case 'v':
+            printf("%s\n\n", doc);
+            exit(EXIT_SUCCESS);
+            break;
+        case 'h':
+            printf("%s\n\n", usage);
+            printf("%s\n", optionsstr);
+            exit(EXIT_SUCCESS);
+            break;
+        default:
+            printf("%s\n\n", usage);
+            printf("%s\n", optionsstr);
+            exit(EXIT_FAILURE);
+		}
+	}
+
+    cv::VideoCapture camera(0);
     if(!camera.isOpened())
         printf("Open camera error\n");
     else
@@ -98,7 +153,7 @@ int main(int argc, char **argv)
 
     //record video for 1 second to calculate fps
     //do all the normal image processes
-    video = new cv::VideoWriter("md_test.avi",
+    video = new cv::VideoWriter(videoDir + "md_test.avi",
         cv::VideoWriter::fourcc('M','J','P','G'), 15, cv::Size(IMAGE_WIDTH, IMAGE_HEIGHT));
     uint64_t lastTime = GetTimeUs();
     uint32_t fps = 0;
@@ -109,7 +164,8 @@ int main(int argc, char **argv)
         fps++;
     }
     video->release();
-    std::system("rm md_test.avi");
+    std::string rmCmd = "rm " + videoDir + "md_test.avi";
+    std::system(rmCmd.c_str());
 
     printf("start detection at %s\n", GetLocalTimeStr().c_str());
 
@@ -130,7 +186,7 @@ int main(int argc, char **argv)
         if(bMotionDetected) {
             if(!bVideoRecording) {
                 bVideoRecording = true;
-                video = new cv::VideoWriter(LocalTimeToName()+".avi",
+                video = new cv::VideoWriter(videoDir + LocalTimeToName() + ".avi",
                     cv::VideoWriter::fourcc('M','J','P','G'), fps, cv::Size(IMAGE_WIDTH, IMAGE_HEIGHT));
                 printf("  start recording at %s with %u fps\n", GetLocalTimeStr().c_str(), fps);
             }
