@@ -18,7 +18,7 @@ Simple OpenCV C++ motion detect on Raspberry Pi
     ```
     sudo v4l2-ctl --set-ctrl=rotate=180
     ```
-- Run motion detect. It records .avi files.
+- Run motion detect. It records .avi files in spedified folder.
     ```
-    sudo ./motion_detect
+    sudo ./motion_detect -d /home/user/video
     ```
